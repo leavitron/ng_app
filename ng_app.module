@@ -1,0 +1,246 @@
+<?php
+/**
+ * @file ng_app.module
+ *
+ * Implements the AngularJS-driven app root.
+ */
+
+function ng_app_init_app() {
+  global $appsettings;
+  angularjs_init_application('ngApp'); // todo: remove dependencie
+  $config_file = variable_get('ng_app_config_file',drupal_get_path('module', 'ng_app') . '/appsettings.json');
+  $appsettings = ng_app_get_appsettings_json($config_file,true);
+  variable_set('ng_app_path_to_framework',$appsettings['path_to_lib']);
+  variable_set('ng_app_config_file',$config_file);
+  variable_set('ng_app_appsettings',$appsettings);
+  $lib = $appsettings['path_to_lib'].'/';
+  $module_settings = array(
+    'config_file' => $config_file,
+    'widgets' => $appsettings['widgets'],
+    'path_to_module' => drupal_get_path('module', 'ng_app'),
+    'path_to_framework' => $lib,
+    'restws_csrf_token' => drupal_get_token('restws'),
+    'basePath' => url('', array(
+      'absolute' => TRUE
+    ))
+  );
+  drupal_add_js(array('ng_app' => $module_settings), 'setting');
+  foreach ($appsettings['dependencies'] as $d => $dependencie) {
+    drupal_add_js($lib . $dependencie);
+  }
+  foreach ($appsettings['styleSheets'] as $s => $css) {
+    drupal_add_css($lib.$css, array('group' => CSS_THEME, 'type' => 'external'));
+  }
+  $angular_modules = $appsettings['angular_modules'];
+  $widgets = $appsettings['widgets'];
+  foreach ($widgets as $index => $widget) {
+    $keys = array_keys($widget);
+    array_push($angular_modules, "ngApp.".$keys[0]);
+  }
+  $script = '
+    angular.module("ngApp",'.drupal_json_encode($angular_modules).')
+        .controller("ngAppCtrl", function($scope,$http,AppService,AppSettings,DrupalService) {
+            AppService.initialize({
+                config_file: window.Drupal.settings.ng_app.config_file,
+                scope: $scope,
+                callback:function(){
+                    AppSettings.siteParams = window.Drupal.settings.domain_tools;
+                    AppSettings.baseUrl = AppSettings.siteParams.base_root+AppSettings.siteParams.base_path;
+                    DrupalService.initialize({domain:AppSettings.siteParams.domain,version:AppSettings.version,callback:function(){
+                        $scope.$broadcast("init",$scope)
+                    }})
+                }
+            });
+        });
+  ';
+  $handle = fopen(drupal_get_path('module', 'ng_app') . '/js/app.js', 'w+');
+  if($handle){
+    if(!fwrite($handle, $script))
+      die("couldn't write to file.");
+  }
+  drupal_add_js(drupal_get_path('module', 'ng_app') . '/js/app.js');
+  drupal_add_js(drupal_get_path('module', 'ng_app') . '/js/controllers.js');
+  drupal_add_js(drupal_get_path('module', 'ng_app') . '/js/directives.js');
+  drupal_add_js(drupal_get_path('module', 'ng_app') . '/js/services.js');
+}
+
+function ng_app_register_block($settings){
+  $appsettings = variable_get('ng_app_appsettings');
+  $widgets = &$appsettings['widgets'];
+  $widgets[count($widgets)] = array($settings['delta'] => $settings);
+  variable_set('ng_app_appsettings',$appsettings);
+  drupal_add_js('jQuery(document).ready(function () {
+    Drupal.settings.ng_app.widgets.push('.drupal_json_encode(array($settings['delta'] => $settings)).');
+  });', 'inline');
+}
+
+/**
+ * Implements hook_preprocess_HOOK()
+ */
+function ng_app_preprocess_html(&$variables) {
+  ng_app_init_app();
+  $variables['attributes_array']['ng-app'] = 'ngApp';  // attach angular app
+  $variables['attributes_array']['ng-controller'] = 'ngAppCtrl';  // attach app root controller
+}
+function ng_app_preprocess_node(&$variables) {
+  $node = $variables['node'];
+  $variables['attributes_array']['data-nid'] = $node->nid;
+  $variables['attributes_array']['data-type'] = $node->type;
+  $variables['classes_array'][] = 'angular-node';
+}
+
+/**
+ * Implements hook_block_view().
+ */
+function ng_app_block_view($delta = '') {
+  $block = array();
+  $appsettings = variable_get('ng_app_appsettings');
+  $widgets = $appsettings['widgets'];
+  foreach ($widgets as $a => $widget) {
+    if (isset($widget[$delta])){
+      $settings = $widget[$delta];
+      $settings['id'] = $delta;
+      drupal_add_js(array($delta => array(
+        'model' => $settings
+      )),'setting');
+      $block['subject'] = t($settings['title']);
+      $block['content'] = array(
+        '#theme' => $delta,
+        '#attached' => array(
+          'js' => array(),
+        ),
+      );
+    }
+  }
+  return $block;
+}
+
+/**
+ * Implements hook_theme().
+ */
+function ng_app_theme() {
+  $appsettings = variable_get('ng_app_appsettings');
+  $widgets = $appsettings['widgets'];
+  $array = array();
+  foreach ($widgets as $key => $widget) {
+    $keys = array_keys($widget);
+    $id = $keys[0];
+    $path = drupal_get_path('module','ng_app') . '/' . $id;
+    if(isset($widget[$id]['path'])){
+      $path = $widget[$id]['path']; // separate modules
+      drupal_add_js(drupal_get_path('module', $widget[$id]['delta']).'/'.$widget[$id]['delta'].'.js');
+    }else{
+      drupal_add_js(drupal_get_path('module', 'ng_app').'/'.$id.'/'.$id.'.js');
+    }
+    $array[$id] = array(
+      'template' => '/'.$id,
+      'variables' => $widget[$id],
+      'path' => $path
+    );
+  }
+  return $array;
+}
+
+/**
+ * Implements hook_block_info().
+ */
+function ng_app_block_info() {
+  $blocks = array();
+  $appsettings = variable_get('ng_app_appsettings');
+  $widgets = $appsettings['widgets'];
+  foreach ($widgets as $key => $widget) {
+    $keys = array_keys($widget);
+    $id = $keys[0];
+    $blocks[$id] = array(
+      'info' => t('Angular: '.$widget[$id]['title'])
+    );
+  }
+  return $blocks;
+}
+
+
+/**
+ * Implements hook_admin()
+ */
+//function ng_app_admin() {
+//  $form = array();
+//  $form['ng_app_path_to_framework'] = array(
+//    '#type' => 'textfield',
+//    '#title' => t('Angular App Libraries.'),
+//    '#default_value' => variable_get('ng_app_path_to_framework', 'sites/all/libraries/app_server/public'),
+//    //'#default_value' => variable_get('ng_app_path_to_framework', "http://app_server.eu01.aws.af.cm"),
+//    '#size' => 255,
+//    '#maxlength' => 255,
+//    '#description' => t("Path to the Angular app libraries."),
+//    '#required' => TRUE,
+//  );
+//  return system_settings_form($form);
+//}
+
+/**
+ * Implements hook_menu()
+ */
+//function ng_app_menu() {
+//  $items['admin/config/media/ng_app'] = array(
+//    'title' => t('Angular Apps'),
+//    'description' => t('ng-app module settings.'),
+//    'page callback' => 'drupal_get_form',
+//    'page arguments' => array('ng_app_admin'),
+//    'access arguments' => array('access administration pages'),
+//    'type' => MENU_NORMAL_ITEM,
+//  );
+//  return $items;
+//}
+
+/**
+ * Alter the theme hook suggestions used by the fences module.
+ *
+ * @param $fences
+ *   An array containing the data returned by hook_fences_suggestion_info().
+ */
+function ng_app_fences_suggestion_info_alter(&$fences) {
+//   $fences['field']['div'] =  array(
+//     'label' => t('div'),
+//     'element' => 'div', // If multiple elements are  used they should be seperated by spaces, e.g. 'pre code'.
+//     'description' => t('<div> - attaches the angular fieldController'),
+//     'groups' => array(t('Angular directives')),
+//  );
+//  $fences['field']['swipe'] =  array(
+//    'label' => t('swipe'),
+//    'element' => 'swipe', // If multiple elements are  used they should be seperated by spaces, e.g. 'pre code'.
+//    'description' => t('<swipe> - wrap fields in a swipable element (use only for multiple fields)'),
+//    'groups' => array(t('Angular directives')),
+//  );
+//  $fences['field']['accordion'] =  array(
+//    'label' => t('accordion'),
+//    'element' => 'accordion', // If multiple elements are  used they should be seperated by spaces, e.g. 'pre code'.
+//    'description' => t('<accordion> - wrap fields in a accordion element (use only for multiple fields)'),
+//    'groups' => array(t('Angular directives')),
+//  );
+  return $fences;
+}
+
+
+function ng_app_get_appsettings_json($url,$jsonp = false){
+  $file = $url;
+  $string = file_get_contents($file);
+  $object = json_decode($string,true);
+  $settingsTemp = array();
+  if (isset($object['appsettings']['add'])){ // legacy flex
+    foreach ($object['appsettings']['add'] as $add => $add_a) {
+      $settingsTemp[$add_a['key']] = $add_a['value'];
+    }
+  }else{
+    $settingsTemp = json_decode($string,true);
+  }
+  // save jsonp version
+  if($jsonp == true){
+    $jsonp = "JsonWrapping(". $string .");";
+    $handle = fopen($url.'p', 'w+');
+    if($handle){
+      if(!fwrite($handle, $jsonp))
+        die("couldn't write to file.");
+    }
+  }
+  return $settingsTemp;
+}

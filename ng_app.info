@@ -1,0 +1,8 @@
+name = Ng App
+description = Implements AngularJS-driven blocks.
+package = stoute
+dependencies[] = angularjs
+dependencies[] = domain_tools
+dependencies[] = fences
+dependencies[] = libraries
+core = 7.x

@@ -1,0 +1,58 @@
+JsonWrapping({
+    "version":"drupal-7",
+    "domain":"drupal-7-src:8888",
+    "path_to_lib": "http://dl.dropboxusercontent.com/u/1037880/libraries/app_server/src",
+    "widgets": [
+        {"ng_block_1": {
+            "title":"taxonomy tree",
+            "vid":"1",
+            "maxDepth": "10",
+            "view_name": "taxonomy_term"
+        }},
+        {"ng_block_2": {
+            "title":"angular: ng_block_2",
+            "vid": "1",
+            "maxDepth": "10",
+            "view_name": "taxonomy_term",
+            "view_arguments": "args[0]=1&args[1]=test"
+        }},
+        {"ng_block_3": {
+            "title":"Ng Block 3 --    ",
+            "test": "Het werkt",
+            "test2": "test 2"
+        }}
+    ],
+    "angular_modules": [
+        "ngApp.ng_weather",
+        "ui.bootstrap",
+        "stoute.ng-baseApp",
+        "stoute.ng-drupalService",
+        "stoute.ng-swipe",
+        "stoute.require",
+        "ngApp.controllers",
+        "ngApp.directives",
+        "ngApp.services"
+    ],
+    "dependencies": [
+        "/js/lib/require.js",
+        "/js/angular_modules/vendor/ui-bootstrap-tpls.min.js",
+        "/js/angular_modules/ng-baseApp/ng-baseApp.js",
+        "/js/angular_modules/ng-drupalService/ng-drupalService.js",
+        "/js/angular_modules/ng-require/ng-require.js",
+        "/js/angular_modules/ng-swipe/ng-swipe.js",
+        "/js/angular_modules/ng-swipe/swipe.min.js"
+    ],
+    "require": [
+        "http://app_server.eu01.aws.af.cm/node_modules/util/util.js"
+    ],
+    "styleSheets": [
+        "/css/common.css",
+        "/js/angular_modules/ng-swipe/style.css"
+    ],
+    "path_to_dropbox": "http://dl.dropboxusercontent.com/u/1037880",
+    "environment":"module",
+    "app_namespace":"app",
+    "static":"false",
+    "dev":"false",
+    "debug":"true"
+});

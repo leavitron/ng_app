@@ -1,7 +1,7 @@
 name = Ng App
 description = Implements an AngularJS app.
 package = stoute
-dependencies[] = angularjs
+#dependencies[] = angularjs
 dependencies[] = domain_tools
 dependencies[] = fences
 dependencies[] = libraries

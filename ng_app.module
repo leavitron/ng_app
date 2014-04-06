@@ -5,20 +5,31 @@
  * Implements the AngularJS-driven app root.
  */
 
-function ng_app_init_app() {
-  global $appsettings;
+function ng_app_init(){
+  global $ng_app_path_to_lib;
+  $ng_app_path_to_lib = "http://app_server.eu01.aws.af.cm";
+  $settings_js = array(
+    'path_to_lib' => variable_get('ng_app_path_to_lib',NULL),
+  );
+  drupal_add_js(array('ng_app' => $settings_js), 'setting');
+}
+
+function ng_app_register_module($module,$config_file) {
   angularjs_init_application('ngApp'); // todo: remove dependencie
-  $config_file = variable_get('ng_app_config_file',drupal_get_path('module', 'ng_app') . '/appsettings.json');
+  $lib = variable_get('ng_app_path_to_lib');
   $appsettings = ng_app_get_appsettings_json($config_file,true);
-  variable_set('ng_app_path_to_framework',$appsettings['path_to_lib']);
+  $appsettings['path_to_lib'] = $lib;
+  drupal_add_js($lib.'/js/lib/require.js');
+  drupal_add_js($lib.'/js/app-ng.js');
+  variable_set('ng_app_module',$module);
   variable_set('ng_app_config_file',$config_file);
   variable_set('ng_app_appsettings',$appsettings);
-  $lib = $appsettings['path_to_lib'].'/';
   $module_settings = array(
     'config_file' => $config_file,
     'widgets' => $appsettings['widgets'],
     'path_to_module' => drupal_get_path('module', 'ng_app'),
-    'path_to_framework' => $lib,
+    'path_to_lib' => $lib,
+    'domain' => $GLOBALS['_SERVER']['HTTP_HOST'].rtrim(base_path(), "/"),
     'restws_csrf_token' => drupal_get_token('restws'),
     'basePath' => url('', array(
       'absolute' => TRUE
@@ -59,26 +70,30 @@ function ng_app_init_app() {
       die("couldn't write to file.");
   }
   drupal_add_js(drupal_get_path('module', 'ng_app') . '/js/app.js');
-  drupal_add_js(drupal_get_path('module', 'ng_app') . '/js/controllers.js');
-  drupal_add_js(drupal_get_path('module', 'ng_app') . '/js/directives.js');
-  drupal_add_js(drupal_get_path('module', 'ng_app') . '/js/services.js');
 }
 
-function ng_app_register_block($settings){
-  $appsettings = variable_get('ng_app_appsettings');
-  $widgets = &$appsettings['widgets'];
-  $widgets[count($widgets)] = array($settings['delta'] => $settings);
-  variable_set('ng_app_appsettings',$appsettings);
-  drupal_add_js('jQuery(document).ready(function () {
-    Drupal.settings.ng_app.widgets.push('.drupal_json_encode(array($settings['delta'] => $settings)).');
-  });', 'inline');
+/**
+ * Implements hook_admin()
+ */
+function ng_app_admin() {
+  global $ng_app_path_to_lib;
+  $form = array();
+  $form['ng_app_path_to_lib'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Path to libraries.'),
+    '#default_value' => variable_get('ng_app_path_to_lib', $ng_app_path_to_lib),
+    '#size' => 255,
+    '#maxlength' => 255,
+    '#description' => t("Path to the ng_app library."),
+    '#required' => TRUE,
+  );
+  return system_settings_form($form);
 }
 
 /**
  * Implements hook_preprocess_HOOK()
  */
 function ng_app_preprocess_html(&$variables) {
-  ng_app_init_app();
   $variables['attributes_array']['ng-app'] = 'ngApp';  // attach angular app
   $variables['attributes_array']['ng-controller'] = 'ngAppCtrl';  // attach app root controller
 }
@@ -86,7 +101,7 @@ function ng_app_preprocess_node(&$variables) {
   $node = $variables['node'];
   $variables['attributes_array']['data-nid'] = $node->nid;
   $variables['attributes_array']['data-type'] = $node->type;
-  $variables['classes_array'][] = 'angular-node';
+  //$variables['classes_array'][] = 'angular-node';
 }
 
 /**
@@ -122,16 +137,15 @@ function ng_app_theme() {
   $appsettings = variable_get('ng_app_appsettings');
   $widgets = $appsettings['widgets'];
   $array = array();
+  $path = drupal_get_path('module',variable_get('ng_app_module'));
+  drupal_add_js($path.'/js/controllers.js');
+  drupal_add_js($path.'/js/directives.js');
+  drupal_add_js($path.'/js/services.js');
   foreach ($widgets as $key => $widget) {
     $keys = array_keys($widget);
     $id = $keys[0];
-    $path = drupal_get_path('module','ng_app') . '/' . $id;
-    if(isset($widget[$id]['path'])){
-      $path = $widget[$id]['path']; // separate modules
-      drupal_add_js(drupal_get_path('module', $widget[$id]['delta']).'/'.$widget[$id]['delta'].'.js');
-    }else{
-      drupal_add_js(drupal_get_path('module', 'ng_app').'/'.$id.'/'.$id.'.js');
-    }
+    $path = drupal_get_path('module',variable_get('ng_app_module')) . '/' . $id;
+    drupal_add_js(drupal_get_path('module', variable_get('ng_app_module')).'/'.$id.'/'.$id.'.js');
     $array[$id] = array(
       'template' => '/'.$id,
       'variables' => $widget[$id],
@@ -158,24 +172,6 @@ function ng_app_block_info() {
   return $blocks;
 }
 
-
-/**
- * Implements hook_admin()
- */
-//function ng_app_admin() {
-//  $form = array();
-//  $form['ng_app_path_to_framework'] = array(
-//    '#type' => 'textfield',
-//    '#title' => t('Angular App Libraries.'),
-//    '#default_value' => variable_get('ng_app_path_to_framework', 'sites/all/libraries/app_server/public'),
-//    //'#default_value' => variable_get('ng_app_path_to_framework', "http://app_server.eu01.aws.af.cm"),
-//    '#size' => 255,
-//    '#maxlength' => 255,
-//    '#description' => t("Path to the Angular app libraries."),
-//    '#required' => TRUE,
-//  );
-//  return system_settings_form($form);
-//}
 
 /**
  * Implements hook_menu()

@@ -1,6 +1,5 @@
 angular.module('ngApp.controllers', [])
 
-
     .controller('fieldCtrl', function($scope,$element,$attrs) {
         // console.log($attrs)
     })
@@ -36,37 +35,5 @@ angular.module('ngApp.controllers', [])
         };
         $scope.groupHeader = 'show'; // fixme
     })
-
-
-
-    // fixme: put in submodule
-
-    .controller('ngWeatherCtrl', function($scope, $http, $log) {
-        console.log('ngWeatherCtrl');
-        // alert('ngWeatherCtrl');
-        $scope.city = 'Paris';
-        $scope.units = 'metric';
-        //  process form submission.
-        $scope.change = function() {
-            var url = 'http://api.openweathermap.org/data/2.5/weather';
-            $http.jsonp(url, { params : {
-                q : $scope.city,
-                units : $scope.units,
-                callback: 'JSON_CALLBACK'
-            }}).
-                success(function(data, status, headers, config) {
-                    $scope.main = data.main;
-                    $scope.wind = data.wind;
-                    $scope.description = data.weather[0].description;
-                }).
-                error(function(data, status, headers, config) {
-                    $log.error('Could not retrieve data from ' + url); // Log an error in the browser's console
-                });
-        };
-        // Trigger form submission for first load.
-        $scope.change();
-    })
-
-
 
 ;

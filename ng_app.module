@@ -5,11 +5,11 @@
  * Implements the AngularJS-driven app root.
  */
 
-function ng_app_init_app() {
-  global $appsettings;
+function ng_app_register_module($module,$config_file) {
   angularjs_init_application('ngApp'); // todo: remove dependencie
-  $config_file = variable_get('ng_app_config_file',drupal_get_path('module', 'ng_app') . '/appsettings.json');
+  global $appsettings;
   $appsettings = ng_app_get_appsettings_json($config_file,true);
+  variable_set('ng_app_module',$module);
   variable_set('ng_app_path_to_framework',$appsettings['path_to_lib']);
   variable_set('ng_app_config_file',$config_file);
   variable_set('ng_app_appsettings',$appsettings);
@@ -19,6 +19,7 @@ function ng_app_init_app() {
     'widgets' => $appsettings['widgets'],
     'path_to_module' => drupal_get_path('module', 'ng_app'),
     'path_to_framework' => $lib,
+    'domain' => $GLOBALS['_SERVER']['HTTP_HOST'].rtrim(base_path(), "/"),
     'restws_csrf_token' => drupal_get_token('restws'),
     'basePath' => url('', array(
       'absolute' => TRUE
@@ -64,21 +65,10 @@ function ng_app_init_app() {
   drupal_add_js(drupal_get_path('module', 'ng_app') . '/js/services.js');
 }
 
-function ng_app_register_block($settings){
-  $appsettings = variable_get('ng_app_appsettings');
-  $widgets = &$appsettings['widgets'];
-  $widgets[count($widgets)] = array($settings['delta'] => $settings);
-  variable_set('ng_app_appsettings',$appsettings);
-  drupal_add_js('jQuery(document).ready(function () {
-    Drupal.settings.ng_app.widgets.push('.drupal_json_encode(array($settings['delta'] => $settings)).');
-  });', 'inline');
-}
-
 /**
  * Implements hook_preprocess_HOOK()
  */
 function ng_app_preprocess_html(&$variables) {
-  ng_app_init_app();
   $variables['attributes_array']['ng-app'] = 'ngApp';  // attach angular app
   $variables['attributes_array']['ng-controller'] = 'ngAppCtrl';  // attach app root controller
 }
@@ -125,13 +115,8 @@ function ng_app_theme() {
   foreach ($widgets as $key => $widget) {
     $keys = array_keys($widget);
     $id = $keys[0];
-    $path = drupal_get_path('module','ng_app') . '/' . $id;
-    if(isset($widget[$id]['path'])){
-      $path = $widget[$id]['path']; // separate modules
-      drupal_add_js(drupal_get_path('module', $widget[$id]['delta']).'/'.$widget[$id]['delta'].'.js');
-    }else{
-      drupal_add_js(drupal_get_path('module', 'ng_app').'/'.$id.'/'.$id.'.js');
-    }
+    $path = drupal_get_path('module',variable_get('ng_app_module')) . '/' . $id;
+    drupal_add_js(drupal_get_path('module', variable_get('ng_app_module')).'/'.$id.'/'.$id.'.js');
     $array[$id] = array(
       'template' => '/'.$id,
       'variables' => $widget[$id],

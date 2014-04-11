@@ -7,175 +7,206 @@
 
 function ng_app_init(){
   global $ng_app_path_to_lib;
-  $ng_app_path_to_lib = "http://app_server.eu01.aws.af.cm";
-  $settings_js = array(
-    'path_to_lib' => variable_get('ng_app_path_to_lib',NULL),
+  $ng_app_path_to_lib = variable_get('ng_app_path_to_lib','http://app_server.eu01.aws.af.cm');
+  $module_settings = array(
+    'path_to_lib' => $ng_app_path_to_lib,
+    'restws_csrf_token' => drupal_get_token('restws'),
+    'basePath' => url('', array('absolute' => TRUE))
   );
-  drupal_add_js(array('ng_app' => $settings_js), 'setting');
+  drupal_add_js(array('ng_app' => $module_settings), 'setting');
+}
+function ng_app_preprocess_html(&$variables) {
+  if(variable_get('ng_app_blocks_module')==true){
+    $variables['attributes_array']['ng-app'] = 'ngApp';  // attach angular app
+    $variables['attributes_array']['ng-controller'] = 'ngAppCtrl';  // attach app root controller
+  }
+}
+function ng_app_page_build (&$page) { // FIXME:
+//  $page['page_top']['ng_app_template'] = array(
+//    '#weight' => -1000,
+//    '#markup' => '<div id="ngAppView" ng-hide="isBusy" ng-view></div>'
+//  );
 }
 
 function ng_app_register_module($module,$config_file) {
-  angularjs_init_application('ngApp'); // todo: remove dependencie
+  global $ng_app_has_blocks;
+  if($module=='ng_blocks'){
+    $ng_app_has_blocks = true;
+    // variable_set('ng_app_blocks_module',$module);
+  }
+  // angularjs_init_application('ngApp'); // fixme: remove dependency
+  //global $ng_app_path_to_lib;
+  // $lib = $ng_app_path_to_lib;
+  $lib = variable_get('ng_app_path_to_lib','http://app_server.eu01.aws.af.cm');
   $path_to_app = $GLOBALS['base_root'].base_path().drupal_get_path('module', $module);
-  $lib = variable_get('ng_app_path_to_lib');
-  $appsettings = ng_app_get_appsettings_json($config_file,true);
+  $jsonp = true;
+  if($module == "ng_blocks"){ $jsonp = false;}
+  $ng_app_config_file = $GLOBALS['base_root'].base_path().drupal_get_path('module', $module).'/appsettings.json';
+  if($jsonp == true){ $ng_app_config_file .= 'p';}
+  $appsettings = ng_app_get_appsettings_json($config_file,$jsonp);
   $appsettings['path_to_lib'] = $lib;
   variable_set('ng_app_module',$module);
-  variable_set('ng_app_config_file',$config_file);
   variable_set('ng_app_appsettings',$appsettings);
-  $module_settings = array(
-    'config_file' => $config_file,
-    'widgets' => $appsettings['widgets'],
-    'path_to_module' => drupal_get_path('module', 'ng_app'),
-    'path_to_lib' => $lib,
-    'domain' => $GLOBALS['_SERVER']['HTTP_HOST'].rtrim(base_path(), "/"),
-    'restws_csrf_token' => drupal_get_token('restws'),
-    'basePath' => url('', array(
-      'absolute' => TRUE
-    ))
-  );
-  drupal_add_js(array('ng_app' => $module_settings), 'setting');
   // js scripts
   $ng_app_modules = $appsettings['ng_app_modules'];
   $ng_app_standalone_insert = '';
-  foreach ($appsettings['dependencies'] as $d => $dependencie) {
-    drupal_add_js($lib . $dependencie);
-    $ng_app_standalone_insert .= '<script src="'.$lib . $dependencie.'"></script>';
+  if(isset($appsettings['dependencies'])){
+    foreach ($appsettings['dependencies'] as $d => $dependencie) {
+      if(isset($appsettings['ng_app_blocks'])){
+        drupal_add_js($lib . $dependencie);
+      }
+      $ng_app_standalone_insert .= '<script src="'.$lib . $dependencie.'"></script>';
+    }
   }
-  $ng_app_standalone_insert .= '<script src="js/app.js"></script>';
   $ng_app_scripts = array(
     'js/controllers.js',
     'js/directives.js',
     'js/services.js'
   );
-  foreach ($appsettings['styleSheets'] as $s => $css) {
-    drupal_add_css($lib.$css, array('group' => CSS_THEME, 'type' => 'external'));
-    $ng_app_standalone_insert .= '<link rel="stylesheet" href='.$lib.$css.'"/>';
+  // styleSheets
+  if(isset($appsettings['styleSheets'])){
+    foreach ($appsettings['styleSheets'] as $s => $css) {
+      drupal_add_css($lib.$css, array('group' => CSS_THEME, 'type' => 'external'));
+      $ng_app_standalone_insert .= '<link rel="stylesheet" href='.$lib.$css.'"/>';
+    }
   }
   foreach ($ng_app_scripts as $i => $script) {
-    drupal_add_js($path_to_app.'/'.$script);
+    if(isset($appsettings['ng_app_blocks'])){
+      drupal_add_js($path_to_app.'/'.$script);
+    }
     $ng_app_standalone_insert .= '<script src="'.$script.'"></script>';
   }
-  $widgets = $appsettings['widgets'];
-  foreach ($widgets as $index => $widget) {
-    $keys = array_keys($widget);
-    array_push($ng_app_modules, "ngApp.".$keys[0]);
-    array_push($ng_app_scripts, '/'. $keys[0] .'/'. $keys[0] .'.js');
-    $ng_app_standalone_insert .= '<script src="'.$path_to_app.'/'. $keys[0] .'/'. $keys[0] .'.js"></script>';
+  if(isset($appsettings['ng_app_blocks'])){
+    $ng_app_blocks = $appsettings['ng_app_blocks'];
+    foreach ($ng_app_blocks as $index => $widget) {
+      $keys = array_keys($widget);
+      array_push($ng_app_modules, "ngApp.".$keys[0]);
+      array_push($ng_app_scripts, '/'. $keys[0] .'/'. $keys[0] .'.js');
+      // $ng_app_standalone_insert .= '<script src="'.$path_to_app.'/'. $keys[0] .'/'. $keys[0] .'.js"></script>';
+    }
+  }
+  $templateUrl = $appsettings['path_to_templates'].'/'.$appsettings['template'];
+  if (strpos($templateUrl,'.html') == false) {
+    $templateUrl = '';
   }
 
-  // standdalone: app.js
+  // standalone: app.js
   $script = '
-    /*
-    * DO NOT ALTER: dynamically generated Drupal app:
-    */
-    var ng_app_modules = '.drupal_json_encode($ng_app_modules).';
-    var ng_app_config_file = "'.$GLOBALS['base_root'].base_path().drupal_get_path('module', $module).'/appsettings.jsonp";
-    var ng_app_domain= "'.$GLOBALS['_SERVER']['HTTP_HOST'].rtrim(base_path(), "/").'";
-    window.Drupal = window.Drupal || {};
-    window.Drupal.settings = window.Drupal.settings || {};
-    window.Drupal.settings.baseUrl = "http://"+ng_app_domain+"/";
+            /*
+            * DO NOT ALTER THIS SCRIPT: dynamically generated Drupal / Angular app
+            */
+            var ng_app_modules = '.drupal_json_encode($ng_app_modules).';
+            var ng_app_domain= "'.$GLOBALS['_SERVER']['HTTP_HOST'].rtrim(base_path(), "/").'";
+            var ng_app_config_file = "'.$ng_app_config_file.'";
+            window.Drupal = window.Drupal || {};
+            window.Drupal.settings = window.Drupal.settings || {};
+            window.Drupal.settings.baseUrl = "http://"+ng_app_domain+"/";
 
-     angular.module("ngApp",ng_app_modules)
-        .controller("ngAppCtrl", function($scope,$http,AppService,AppSettings,DrupalService,Node) {
-            AppSettings.domain = ng_app_domain;
-            AppSettings.baseUrl = "http://"+ng_app_domain+"/";
-            AppService.initialize({
-                config_file: ng_app_config_file ,
-                scope: $scope,
-                callback:function(){
-                    DrupalService.initialize({domain:AppSettings.domain,callback:function(){
-                        // pass block models
-                        var widgets = AppSettings.widgets;
-                        for(var k in widgets){
-                          for(var kk in widgets[k]){
-                             window.Drupal.settings[kk]={}
-                             window.Drupal.settings[kk].model=widgets[k][kk]
-                          }
+            var app = angular.module("ngApp",ng_app_modules)
+                .controller("ngAppCtrl", function($scope,$http,$route,AppService,AppSettings,DrupalService,Node) {
+                    app._rootScope = $scope;
+                    $scope.isBusy = true;
+                    var lastRoute = $route.current;
+                    $scope.$on("$routeChangeSuccess",function(event){
+                            AppSettings.currentRoute = $route.current
+                            $scope.$broadcast("routeChange",$route.current)
                         }
-                        $scope.$broadcast("init",$scope);
-                        $scope.render()
-                    }})
-                }
-            });
-            $scope.render = function(){
+                    );
+                })
+                .config(["$routeProvider",function ($routeProvider) {
+                    $routeProvider
+                      .when("/", {
+                            templateUrl: "'.$templateUrl.'",
+                            controller: "MainCtrl",
+                            resolve: bootResolve.app,
+                      })
+                      .when("/node/:nid",{
+                            redirectTo: "/",
+                            action: "node.render",
+                      })
+                      .otherwise({
+                         redirectTo: "/"
+                      });
+                }]);
 
-            };
-        });
+             var bootResolve = {
+                      app: ["$q","AppService","AppSettings","DrupalService","require",function ($q,AppService,AppSettings,DrupalService,require) {
+                          var defer = $q.defer();
+                          var scope = app._rootScope
+                          if(AppService.ready){
+                              defer.resolve();
+                          }else{
+                              AppSettings.domain = ng_app_domain;
+                              AppSettings.baseUrl = "http://"+ng_app_domain+"/";
+                              AppService.initialize({
+                                  config_file: ng_app_config_file ,
+                                  scope: scope,
+                                  callback:function(){
+                                      DrupalService.initialize({domain:AppSettings.domain,callback:function(){
+                                          // drupal ng_blocks models
+                                          if(AppSettings.ng_app_blocks){
+                                            var ng_app_blocks = AppSettings.ng_app_blocks;
+                                            for(var k in ng_app_blocks){
+                                              for(var kk in ng_app_blocks[k]){
+                                                 window.Drupal.settings[kk]={}
+                                                 window.Drupal.settings[kk].model=ng_app_blocks[k][kk]
+                                              }
+                                            }
+                                          }
+                                          scope.isBusy = false;
+                                          defer.resolve();
+                                          scope.$broadcast("init",scope);
+                                        }
+                                      })
+                                  }
+                              });
+                          }
+                          return defer.promise;
+                      }]
+                  }
   ';
-  $handle = fopen(drupal_get_path('module', $module) . '/js/app.js', 'w+');
-  if($handle){
-    if(!fwrite($handle, $script))
-      die("couldn't write to file.");
+  if(isset($appsettings['ng_app_blocks'])){
+    $handle = fopen(drupal_get_path('module', 'ng_app') . '/js/app.js', 'w+');
+    if($handle){
+      if(!fwrite($handle, $script))
+        die("couldn't write to file.");
+    }
+    drupal_add_js(drupal_get_path('module', 'ng_app') . '/js/app.js');
   }
-  drupal_add_js(drupal_get_path('module', $module) . '/js/app.js');
 
-  // standdalone: index.html
+  // standalone: index.html
   $html = '<!DOCTYPE html>
-          <!--  DO NOT ALTER THIS FILE: dynamically generated Drupal app -->
+          <!--
+          *
+          * DO NOT ALTER THIS FILE: dynamically generated Drupal / Angular app
+          *
+          -->
           <html>
           <head>
               <meta charset="utf-8">
               <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-              <title>ng_blocks</title>
+              <title>'.$module.'</title>
               <meta name="description" content="">
               <meta name="viewport" content="width=device-width">
               <link rel="stylesheet" href="http://app_server.eu01.aws.af.cm/css/vendor/bootstrap.min.css"/>
-             '.$ng_app_standalone_insert.'
           </head>
           <body ng-app="ngApp" ng-controller="ngAppCtrl">
-
-              <div ng-controller="standaloneAppCtrl">standaloneAppCtrl:  {{ test }}</div>
-
-              <div ng-view>
-                    <!--FIXME:-->
-                  <div ng-include src="ng_block_3/ng_block_3.tpl.php"></div>
-                  <div ng-include src="ng_block_3/ng_block_3.tpl.html"></div>
-                  <ng_block_3></ng_block_3>
-              </div>
-
-              <div ng-controller="ng_block_3Ctrl">
-                <h3>{{model.test}}</h3>
-                <h5 class="well">drupal: {{model.test2}}</h5>
-                <h5 class="well">standalone: {{model.testStandAlone}}</h5>
-              </div>
-
-
-
+             <div id="main" class="container" ng-hide="isBusy" ng-view=""></div>
+             '.$ng_app_standalone_insert.'
+             <script>
+                '.$script.'
+             </script>
           </body>
           </html>';
-  $handle = fopen(drupal_get_path('module', $module) . '/index.html', 'w+');
-  if($handle){
-    if(!fwrite($handle, $html))
-      die("couldn't write to file.");
+  if(!isset($appsettings['ng_app_blocks'])){
+    $handle = fopen(drupal_get_path('module', $module) . '/index.html', 'w+');
+    if($handle){
+      if(!fwrite($handle, $html))
+        die("couldn't write to file.");
+    }
   }
 }
 
-/**
- * Implements hook_admin()
- */
-function ng_app_admin() {
-  global $ng_app_path_to_lib;
-  $form = array();
-  $form['ng_app_path_to_lib'] = array(
-    '#type' => 'textfield',
-    '#title' => t('Path to libraries.'),
-    '#default_value' => variable_get('ng_app_path_to_lib', $ng_app_path_to_lib),
-    '#size' => 255,
-    '#maxlength' => 255,
-    '#description' => t("Path to the ng_app library."),
-    '#required' => TRUE,
-  );
-  return system_settings_form($form);
-}
-
-/**
- * Implements hook_preprocess_HOOK()
- */
-function ng_app_preprocess_html(&$variables) {
-  $variables['attributes_array']['ng-app'] = 'ngApp';  // attach angular app
-  $variables['attributes_array']['ng-controller'] = 'ngAppCtrl';  // attach app root controller
-}
 function ng_app_preprocess_node(&$variables) {
   $node = $variables['node'];
   $variables['attributes_array']['data-nid'] = $node->nid;
@@ -189,8 +220,9 @@ function ng_app_preprocess_node(&$variables) {
 function ng_app_block_view($delta = '') {
   $block = array();
   $appsettings = variable_get('ng_app_appsettings');
-  $widgets = $appsettings['widgets'];
-  foreach ($widgets as $a => $widget) {
+  if(!isset($appsettings['ng_app_blocks'])){return block;}
+  $ng_app_blocks = $appsettings['ng_app_blocks'];
+  foreach ($ng_app_blocks as $a => $widget) {
     if (isset($widget[$delta])){
       $settings = $widget[$delta];
       $settings['id'] = $delta;
@@ -213,10 +245,13 @@ function ng_app_block_view($delta = '') {
  * Implements hook_theme().
  */
 function ng_app_theme() {
-  $appsettings = variable_get('ng_app_appsettings');
-  $widgets = $appsettings['widgets'];
+  global $ng_app_has_blocks;
   $array = array();
-  foreach ($widgets as $key => $widget) {
+  if($ng_app_has_blocks!=true){return $array;}
+  $appsettings = variable_get('ng_app_appsettings');
+  if(!isset($appsettings['ng_app_blocks'])){return $array;}
+  $ng_app_blocks = $appsettings['ng_app_blocks'];
+  foreach ($ng_app_blocks as $key => $widget) {
     $keys = array_keys($widget);
     $id = $keys[0];
     $path = drupal_get_path('module',variable_get('ng_app_module')) . '/' . $id;
@@ -236,8 +271,9 @@ function ng_app_theme() {
 function ng_app_block_info() {
   $blocks = array();
   $appsettings = variable_get('ng_app_appsettings');
-  $widgets = $appsettings['widgets'];
-  foreach ($widgets as $key => $widget) {
+  if(!isset($appsettings['ng_app_blocks'])){return $blocks;}
+  $ng_app_blocks = $appsettings['ng_app_blocks'];
+  foreach ($ng_app_blocks as $key => $widget) {
     $keys = array_keys($widget);
     $id = $keys[0];
     $blocks[$id] = array(
@@ -247,21 +283,38 @@ function ng_app_block_info() {
   return $blocks;
 }
 
+/**
+ * Implements hook_admin()
+ */
+function ng_app_admin() {
+  global $ng_app_path_to_lib;
+  $form = array();
+  $form['ng_app_path_to_lib'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Path to libraries.'),
+    '#default_value' => variable_get('ng_app_path_to_lib', $ng_app_path_to_lib),
+    '#size' => 255,
+    '#maxlength' => 255,
+    '#description' => t("Path to the ng_app library."),
+    '#required' => TRUE,
+  );
+  return system_settings_form($form);
+}
 
 /**
  * Implements hook_menu()
  */
-//function ng_app_menu() {
-//  $items['admin/config/media/ng_app'] = array(
-//    'title' => t('Angular Apps'),
-//    'description' => t('ng-app module settings.'),
-//    'page callback' => 'drupal_get_form',
-//    'page arguments' => array('ng_app_admin'),
-//    'access arguments' => array('access administration pages'),
-//    'type' => MENU_NORMAL_ITEM,
-//  );
-//  return $items;
-//}
+function ng_app_menu() {
+  $items['admin/config/development/ng_app'] = array(
+    'title' => t('NgApp'),
+    'description' => t('Ng App module settings.'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('ng_app_admin'),
+    'access arguments' => array('access administration pages'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+  return $items;
+}
 
 /**
  * Alter the theme hook suggestions used by the fences module.

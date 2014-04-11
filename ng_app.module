@@ -5,6 +5,14 @@
  * Implements the AngularJS-driven app root.
  */
 
+<<<<<<< HEAD
+function ng_app_register_module($module,$config_file) {
+  angularjs_init_application('ngApp'); // todo: remove dependencie
+  global $appsettings;
+  $appsettings = ng_app_get_appsettings_json($config_file,true);
+  variable_set('ng_app_module',$module);
+  variable_set('ng_app_path_to_framework',$appsettings['path_to_lib']);
+=======
 function ng_app_init(){
   global $ng_app_path_to_lib;
   $ng_app_path_to_lib = variable_get('ng_app_path_to_lib','http://app_server.eu01.aws.af.cm');
@@ -46,7 +54,29 @@ function ng_app_register_module($module,$config_file) {
   $appsettings = ng_app_get_appsettings_json($config_file,$jsonp);
   $appsettings['path_to_lib'] = $lib;
   variable_set('ng_app_module',$module);
+<<<<<<< HEAD
   variable_set('ng_app_appsettings',$appsettings);
+=======
+>>>>>>> FETCH_HEAD
+  variable_set('ng_app_config_file',$config_file);
+  variable_set('ng_app_appsettings',$appsettings);
+  $module_settings = array(
+    'config_file' => $config_file,
+    'widgets' => $appsettings['widgets'],
+    'path_to_module' => drupal_get_path('module', 'ng_app'),
+<<<<<<< HEAD
+    'path_to_framework' => $lib,
+=======
+    'path_to_lib' => $lib,
+>>>>>>> FETCH_HEAD
+    'domain' => $GLOBALS['_SERVER']['HTTP_HOST'].rtrim(base_path(), "/"),
+    'restws_csrf_token' => drupal_get_token('restws'),
+    'basePath' => url('', array(
+      'absolute' => TRUE
+    ))
+  );
+  drupal_add_js(array('ng_app' => $module_settings), 'setting');
+>>>>>>> FETCH_HEAD
   // js scripts
   $ng_app_modules = $appsettings['ng_app_modules'];
   $ng_app_standalone_insert = '';
@@ -207,6 +237,37 @@ function ng_app_register_module($module,$config_file) {
   }
 }
 
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+=======
+/**
+ * Implements hook_admin()
+ */
+function ng_app_admin() {
+  global $ng_app_path_to_lib;
+  $form = array();
+  $form['ng_app_path_to_lib'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Path to libraries.'),
+    '#default_value' => variable_get('ng_app_path_to_lib', $ng_app_path_to_lib),
+    '#size' => 255,
+    '#maxlength' => 255,
+    '#description' => t("Path to the ng_app library."),
+    '#required' => TRUE,
+  );
+  return system_settings_form($form);
+}
+
+>>>>>>> FETCH_HEAD
+/**
+ * Implements hook_preprocess_HOOK()
+ */
+function ng_app_preprocess_html(&$variables) {
+  $variables['attributes_array']['ng-app'] = 'ngApp';  // attach angular app
+  $variables['attributes_array']['ng-controller'] = 'ngAppCtrl';  // attach app root controller
+}
+>>>>>>> FETCH_HEAD
 function ng_app_preprocess_node(&$variables) {
   $node = $variables['node'];
   $variables['attributes_array']['data-nid'] = $node->nid;

@@ -1,8 +1,6 @@
 name = Ng App
-description = Implements an AngularJS app.
+description = Provides the Angular $rootScope.
 package = stoute
-#dependencies[] = angularjs
 dependencies[] = domain_tools
-dependencies[] = fences
 dependencies[] = libraries
 core = 7.x

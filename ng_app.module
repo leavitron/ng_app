@@ -29,10 +29,9 @@ function ng_app_preprocess_html(&$variables) {
 }
 function ng_app_page_build (&$page) {
   // alter html markup here
-  $params = domain_tools_getParams();
   if(isset($page['content']['system_main']['main'])){
     $main_markup = $page['content']['system_main']['main']['#markup'];
-    if($params['path']=='sections') {
+    if($_GET['q']=='sections') {
 //    $main_markup = str_replace('field field-name-field-product-drums-consumed', 'well field field-name-field-product-drums-consumed', $main_markup);
 //    //$main_markup = str_replace('field field-name-field-product-surface-consumed', 'well field field-name-field-product-surface-consumed', $main_markup);
 //    $main_markup = str_replace('views-field-field-product-surface-consumed', 'well views-field-field-product-surface-consumed', $main_markup);
@@ -52,6 +51,7 @@ function ng_app_register_module($module,$config_file) {
   global $ng_app_angular_modules_drupal;
   global $ng_app_angular_modules_app;
   global $ng_app_module_script;
+  global $ng_app_path_to_app_module;
   global $ng_app_templateUrl;
   global $ng_app_config_file;
   global $ng_app_path_to_lib;
@@ -59,8 +59,8 @@ function ng_app_register_module($module,$config_file) {
   $lib = variable_get('ng_app_path_to_lib',$ng_app_path_to_lib);
   $appsettings = ng_app_get_appsettings_json($config_file,false);
   $appsettings['path_to_lib'] = $lib;
-  variable_set('ng_app_appsettings',$appsettings);
   variable_set('ng_app_module',$module);
+  variable_set('ng_app_appsettings',$appsettings);
   $ng_app_path_to_app_module = drupal_get_path('module', $module);
   $ng_app_path_to_app = $GLOBALS['base_root'].base_path().$ng_app_path_to_app_module;
   $ng_app_config_file = $GLOBALS['base_root'].base_path().drupal_get_path('module', $module).'/appsettings.json';
@@ -140,9 +140,7 @@ function ng_app_block_view($delta = '') {
   $ng_app_blocks = $appsettings['ng_app_blocks'];
   foreach ($ng_app_blocks as $a => $widget) {
     if (isset($widget[$delta])){
-
       array_push($ng_app_angular_modules_drupal,$delta);
-
       $settings = $widget[$delta];
       $settings['id'] = $delta;
       drupal_add_js(array($delta => array(
@@ -156,7 +154,6 @@ function ng_app_block_view($delta = '') {
           'css' => array(),
         ),
       );
-
     }
   }
   return $block;
@@ -172,6 +169,7 @@ function ng_app_render_script(){
   global $ng_app_standalone_insert;
   global $ng_app_templateUrl;
   global $ng_app_module_script;
+  global $ng_app_app_script;
   $appsettings = variable_get('ng_app_appsettings');
   /*
   // ng_app: module js
@@ -216,7 +214,7 @@ function ng_app_render_script(){
   //drupal_add_js(drupal_get_path('module', variable_get('ng_app_module')) . '/app/app.js');
 
   /*
-  // ng_app: standalone js + html
+  // ng_app: standalone js
   */
   $standalone_template = 'templates/main-app.tpl.html';
   $ng_app_blocks = $appsettings['ng_app_blocks'];
@@ -251,44 +249,17 @@ function ng_app_render_script(){
                  );
          })();';
   $ng_app_app_script = str_replace('})();', $script, $ng_app_module_script);
-  //$ng_app_app_script = str_replace($ng_app_config_file, $ng_app_config_file.'p', $ng_app_app_script);
   $ng_app_app_script = str_replace($ng_app_templateUrl, $standalone_template, $ng_app_app_script);
   $ng_app_app_script = str_replace(drupal_json_encode($ng_app_angular_modules_drupal), drupal_json_encode($ng_app_angular_modules_app), $ng_app_app_script);
-  // todo:
-//  if($apsettings.standalone == "true"){
-//    $ng_app_path_to_lib = 'bower_components/app_server_phonegap';
-//  }
-  $html = '<!DOCTYPE html>
-          <!--
-          * Do not alter this file: dynamic Drupal / Angular app
-          -->
-          <html>
-          <head>
-              <meta charset="utf-8">
-              <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-              <title>ng_app</title>
-              <meta name="description" content="">
-              <meta name="viewport" content="width=device-width">
-              <link rel="stylesheet" href="'.$ng_app_path_to_lib.'/assets/css/vendor/bootstrap.min.css"/>
-              <link rel="stylesheet" href="'.$GLOBALS['base_root'].base_path().path_to_theme().'/css/imports/style-barrio.css"/>
-              <link rel="stylesheet" href="'.$GLOBALS['base_root'].base_path().path_to_theme().'/css/style.css"/>
-              <link rel="stylesheet" href="'.$GLOBALS['base_root'].base_path().'sites/all/themes/bootstrap/css/overrides.css"/>
 
-              <script src="'.$ng_app_path_to_lib.'/public-build/bower_components/xdomain/dist/0.6/xdomain.min.js" data-slave="'.$GLOBALS['base_root'].base_path().'proxy.html"></script>
-              <script src="'.$ng_app_path_to_lib.'/public-build/bower_components/jquery/jquery.min.js"></script>
-              <script src="'.$ng_app_path_to_lib.'/public-build/bower_components/bootstrap/dist/js/bootstrap.min.js"></script>
-          </head>
-          <body class="navbar-is-fixed-top" ng-controller="ngAppCtrl">
-              <div id="navbar" class="navbar navbar-fixed-top navbar-default" ng-controller="NavCtrl" ng-cloak>
-                  <ul class="nav menu"><li ng-repeat="block in blocks"><a href="#/block/{{block.delta}}">{{block.title}}</a></li></ul>
-              </div>
-             <div id="main" class="block" ng-view></div>
-                '.$ng_app_standalone_insert.'
-             <script>
-                '.$ng_app_app_script.'
-             </script>
-          </body>
-          </html>';
+  // write standalone phonegap app html
+  if($appsettings['standalone'] == "true"){
+    $ng_app_path_to_lib = 'bower_components/app_server_phonegap';
+    $ng_app_app_script = str_replace($ng_app_config_file, 'appsettings.json', $ng_app_app_script);
+    $ng_app_app_script = str_replace($GLOBALS['base_root'].base_path().$ng_app_path_to_app_module, '', $ng_app_app_script);
+    $ng_app_standalone_insert = str_replace($GLOBALS['base_root'].base_path().$ng_app_path_to_app_module.'/', '', $ng_app_standalone_insert);
+  }
+  include $ng_app_path_to_app_module.'/index.inc';
   $handle = fopen($ng_app_path_to_app_module . '/index.html', 'w+');
   if($handle){
     if(!fwrite($handle, $html))

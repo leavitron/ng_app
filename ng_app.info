@@ -1,6 +1,5 @@
 name = Ng App
 description = Provides the Angular $rootScope.
 package = stoute
-dependencies[] = domain_tools
 dependencies[] = libraries
 core = 7.x
